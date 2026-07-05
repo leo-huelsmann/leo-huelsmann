@@ -1,0 +1,19 @@
+@font-face {
+  font-family: Vinta;
+  src: url(/assets/fonts/Vinta-SemiBold.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Vinta;
+  src: url(/assets/fonts/Vinta-SemiBoldItalic.woff2) format("woff2");
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "DN Manuscript";
+  src: url(/assets/fonts/DNManuscript.woff2) format("woff2");
+  font-weight: 400;
+}
