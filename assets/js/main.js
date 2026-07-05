@@ -89,23 +89,14 @@ function renderKatalog(items) {
         // Add one card to the HTML string
         html += `
             <div class="card">
-
                 <div class="card-image">
-                    <img src="${item['@image']}" alt="${item.stadt}">
+                    <img src="${item['@image']}" alt="${item.station}">
                 </div>
-
                 <div class="card-content">
-
-                    <div class="card-title">
-                        <p>${item.station}${item.Lage}</p>
-                    </div>
-
-                    <div class="card-author ${authorClass}">
-                        ${item.stadt}
-                    </div>
-
+                    <div class="card-line1">${item.station}</div>
+                    <div class="card-line2">${item.Lage || ''}</div>
+                    <div class="card-line3">${item.Linie || ''}</div>
                 </div>
-
             </div>
         `;
     }
