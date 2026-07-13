@@ -1,109 +1,157 @@
-// Store all loaded catalogue data globally
-let allData = [];
-
-// Load the JSON file from the assets/data folder
-fetch('assets/data/katalog.json')
+// Load the CSV file from the root folder
+fetch('ubahn.csv')
     .then(response => {
-
-        // Log the HTTP response so we can check if the file was found
-        console.log('JSON response:', response);
-
-        // If the file was not loaded successfully, throw an error
-        if (!response.ok) {
-            throw new Error('JSON file could not be loaded');
-        }
-
-        // Convert the JSON response into JavaScript data
-        return response.json();
+        if (!response.ok) throw new Error('CSV file could not be loaded');
+        return response.arrayBuffer();
     })
-    .then(data => {
-
-        // Log the loaded data to check if it is an array
-        console.log('Loaded JSON data:', data);
-
-        // Save the loaded data in a global variable
-        allData = data;
-
-        // Render the catalogue cards
-        renderKatalog(allData);
+    .then(buffer => {
+        // Decode UTF-16LE
+        const decoder = new TextDecoder('utf-16le');
+        let text = decoder.decode(buffer);
+        
+        // Remove BOM if present
+        if (text.charCodeAt(0) === 0xFEFF) {
+            text = text.slice(1);
+        }
+        
+        const data = parseCSV(text);
+        renderCarousel(data);
     })
     .catch(error => {
-
-        // Log the error in the browser console
-        console.error('Error loading JSON:', error);
-
-        // Show an error message on the page
-        document.getElementById('katalog').innerHTML =
-            '<div class="loading">Error loading data</div>';
+        console.error('Error loading CSV:', error);
+        document.getElementById('carousel').innerHTML = '<div style="padding: 40px;">Error loading data</div>';
     });
 
+// Simple CSV Parser handling quotes and semicolons
+function parseCSV(text) {
+    const rows = [];
+    let currentRow = [];
+    let currentCell = '';
+    let inQuotes = false;
 
-// Render catalogue items into the HTML page
-function renderKatalog(items) {
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const nextChar = text[i + 1];
 
-    // Get the catalogue container from the HTML document
-    const katalog = document.getElementById('katalog');
-
-    // Check if the catalogue container exists
-    console.log('Catalogue container:', katalog);
-
-    // If the element does not exist, stop the function
-    if (!katalog) {
-        console.error('Element with id="katalog" was not found');
-        return;
+        if (char === '"') {
+            if (inQuotes && nextChar === '"') {
+                currentCell += '"';
+                i++; // Skip the escaped quote
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ';' && !inQuotes) {
+            currentRow.push(currentCell);
+            currentCell = '';
+        } else if (char === '\n' && !inQuotes) {
+            currentRow.push(currentCell);
+            rows.push(currentRow);
+            currentRow = [];
+            currentCell = '';
+        } else if (char === '\r' && !inQuotes) {
+            // ignore carriage returns
+        } else {
+            currentCell += char;
+        }
+    }
+    if (currentCell || currentRow.length > 0) {
+        currentRow.push(currentCell);
+        rows.push(currentRow);
     }
 
-    // Check if the data is really an array
-    if (!Array.isArray(items)) {
-        console.error('Expected an array, but got:', items);
-        return;
+    // Convert array of arrays to array of objects
+    if (rows.length < 2) return [];
+    
+    const headers = rows[0].map(h => h.trim());
+    const data = [];
+    
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.length === 0 || (row.length === 1 && row[0].trim() === '')) continue;
+        
+        const obj = {};
+        for (let j = 0; j < headers.length; j++) {
+            obj[headers[j]] = row[j] ? row[j].trim() : '';
+        }
+        data.push(obj);
     }
+    
+    return data;
+}
 
-    // Log how many items will be rendered
-    console.log('Number of catalogue items:', items.length);
+// Render the carousel slides
+function renderCarousel(data) {
+    const carousel = document.getElementById('carousel');
+    if (!carousel) return;
 
-    // This variable will collect all generated HTML
     let html = '';
 
-    // Loop through every item in the JSON array
-    for (let i = 0; i < items.length; i++) {
+    data.forEach(item => {
+        if (!item.station || item.station === '') return;
 
-        // Get the current item from the array
-        const item = items[i];
+        // Format coordinates
+        let coords = item.Koordinaten || '';
+        coords = coords.replace(/ N /, ' N<br>');
 
-        // Log the current item for debugging
-        console.log('Rendering item:', i, item);
+        // Extract required fields
+        const stadt = item.stadt || '';
+        const station = item.station || '';
+        const stadtteil = item.stadtteil || '';
+        const eroffnung = item['Eröffnung'] || '';
+        const image = item['@image'] || '';
+        const linie = item.linie || '';
+        const umstieg = item['Umsteigemöglichkeit'] || '';
+        const lage = item.lage || '';
+        const extra = item.extra || '';
+        const seite = item.seite || '';
+        const geschichte = item.geschichte || '';
+        const sterne = item.sterne || '';
+        const review = item.review || '';
+        const name = item.name || '';
 
-        // Prepare the author text
-        let authorText = item.Author;
+        // Build left column content (linie, umstieg, lage, extra) handling empty values
+        let leftColHTML = '';
+        if (linie) leftColHTML += `<div>${linie}</div>`;
+        if (umstieg) leftColHTML += `<div>${umstieg}</div>`;
+        if (linie || umstieg) leftColHTML += `<div style="height: 15px;"></div>`; // separator
+        if (lage) leftColHTML += `<div>${lage.replace('#', '')}</div>`;
+        if (lage) leftColHTML += `<div style="height: 15px;"></div>`; // separator
+        if (extra && extra !== '#extra') leftColHTML += `<div>${extra.replace('#', '')}</div>`;
 
-        // Prepare an additional CSS class for unknown authors
-        let authorClass = '';
-
-        // If the author field contains "-", show a nicer text instead
-        if (item.Author === '-') {
-            authorText = 'Autor unbekannt';
-            authorClass = 'unknown';
-        }
-
-        // Add one card to the HTML string
         html += `
-            <div class="card">
-                <div class="card-image">
-                    <img src="${item['@image']}" alt="${item.station}">
+            <div class="slide">
+                <div class="header">
+                    <div class="header-left">
+                        <div>${stadt}</div>
+                        <div>${station}</div>
+                    </div>
+                    <div class="header-right">
+                        <div>${stadtteil}</div>
+                        <div>${coords}</div>
+                        <div>${eroffnung}</div>
+                    </div>
                 </div>
-                <div class="card-content">
-                    <div class="card-line1">${item.station}</div>
-                    <div class="card-line2">${item.Lage || ''}</div>
-                    <div class="card-line3">${item.Linie || ''}</div>
+                
+                <div class="image-container">
+                    <img class="main-image" src="${image}" alt="${station}" loading="lazy">
+                </div>
+                
+                <div class="footer">
+                    <div class="footer-left">
+                        <div class="footer-left-top uppercase">
+                            ${leftColHTML}
+                        </div>
+                        <div>${seite !== '#seite' ? seite : ''}</div>
+                    </div>
+                    <div class="footer-right">
+                        <div class="block-text">
+                            ${geschichte} ${sterne} „${review}“ – ${name}
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
-    }
+    });
 
-    // Log the final generated HTML
-    console.log('Generated HTML:', html);
-
-    // Insert the generated HTML into the catalogue container
-    katalog.innerHTML = html;
+    carousel.innerHTML = html;
 }
