@@ -1,5 +1,20 @@
+let originalData = [];
 let carouselData = [];
 let currentIndex = 0;
+
+// Menu State
+let isMenuOpen = false;
+let currentSort = { field: null, asc: true }; 
+let currentFilters = {};
+let activeDropdown = null;
+let filterOptions = {
+    stadt: new Set(),
+    anfangsbuchstabe: new Set(),
+    linie: new Set(),
+    umstieg: new Set(),
+    stadtteil: new Set(),
+    sterne: new Set()
+};
 
 // Load the CSV file from the root folder
 fetch('ubahn.csv')
@@ -18,8 +33,33 @@ fetch('ubahn.csv')
         }
         
         const data = parseCSV(text);
-        carouselData = data;
-        renderCarousel(data);
+        originalData = data;
+        carouselData = [...data];
+        
+        // Extract filter options
+        data.forEach(item => {
+            if (item.stadt) filterOptions.stadt.add(item.stadt);
+            if (item.station) filterOptions.anfangsbuchstabe.add(item.station.charAt(0).toUpperCase());
+            if (item.linie) {
+                item.linie.split('/').forEach(l => filterOptions.linie.add(l.trim()));
+            }
+            if (item['Umsteigemöglichkeit']) {
+                item['Umsteigemöglichkeit'].split('/').forEach(u => {
+                    let cleaned = u.trim().replace('#', '');
+                    if (cleaned) filterOptions.umstieg.add(cleaned);
+                });
+            }
+            if (item.stadtteil) filterOptions.stadtteil.add(item.stadtteil);
+            if (item.sterne) filterOptions.sterne.add(item.sterne);
+        });
+
+        // Convert sets to sorted arrays
+        for (let key in filterOptions) {
+            filterOptions[key] = Array.from(filterOptions[key]).sort();
+        }
+        
+        renderCarousel(carouselData);
+        setupMenu();
     })
     .catch(error => {
         console.error('Error loading CSV:', error);
@@ -386,3 +426,206 @@ window.addEventListener('keydown', (e) => {
 
 window.addEventListener('resize', adjustLayoutWidths);
 window.addEventListener('load', adjustLayoutWidths);
+
+// --- Menu Logic ---
+function setupMenu() {
+    const menuToggle = document.getElementById('menu-toggle');
+    const menuOverlay = document.getElementById('menu-overlay');
+
+    if (menuToggle) {
+        menuToggle.addEventListener('click', () => {
+            isMenuOpen = !isMenuOpen;
+            if (isMenuOpen) {
+                menuOverlay.style.display = 'flex';
+                renderMenu(true);
+            } else {
+                menuOverlay.style.display = 'none';
+                menuOverlay.innerHTML = '';
+            }
+        });
+    }
+
+    // Event delegation for menu clicks
+    if (menuOverlay) {
+        menuOverlay.addEventListener('click', (e) => {
+            // Dropdown Toggle
+            if (e.target.hasAttribute('data-toggle-dropdown')) {
+                const key = e.target.getAttribute('data-toggle-dropdown');
+                activeDropdown = (activeDropdown === key) ? null : key;
+                renderMenu(false); // Re-render without animation
+            }
+            
+            // Sort direction toggle
+            if (e.target.hasAttribute('data-action') && e.target.getAttribute('data-action') === 'toggle-sort-dir') {
+                currentSort.asc = !currentSort.asc;
+                applyFiltersAndSort();
+                renderMenu(false);
+            }
+
+            // Set Sorting Field
+            if (e.target.hasAttribute('data-sort')) {
+                const field = e.target.getAttribute('data-sort');
+                if (currentSort.field === field) {
+                    // Toggle asc/desc if already selected
+                    currentSort.asc = !currentSort.asc;
+                } else {
+                    currentSort.field = field;
+                    currentSort.asc = true;
+                }
+                applyFiltersAndSort();
+                renderMenu(false);
+            }
+
+            // Set Filter
+            if (e.target.hasAttribute('data-filter-key') && e.target.hasAttribute('data-filter-val')) {
+                const key = e.target.getAttribute('data-filter-key');
+                const val = e.target.getAttribute('data-filter-val');
+                
+                // Toggle filter
+                if (currentFilters[key] === val) {
+                    delete currentFilters[key]; // clear it
+                } else {
+                    currentFilters[key] = val;
+                }
+                
+                applyFiltersAndSort();
+                renderMenu(false);
+            }
+            
+            // Clear specific filter
+            if (e.target.hasAttribute('data-clear-filter')) {
+                const key = e.target.getAttribute('data-clear-filter');
+                delete currentFilters[key];
+                applyFiltersAndSort();
+                renderMenu(false);
+            }
+        });
+    }
+}
+
+function renderMenu(animate = false) {
+    const menuOverlay = document.getElementById('menu-overlay');
+    if (!menuOverlay) return;
+
+    let html = '';
+
+    // Sortierung Section
+    const sortArrow = currentSort.asc ? '^' : 'v';
+    html += `<div class="menu-section-title"><span class="sort-arrow" data-action="toggle-sort-dir">${sortArrow}</span> Sortierung:</div>`;
+    
+    html += `<div class="dropdown-container">`;
+    const sortOptions = [
+        { field: 'stadt', label: 'Stadt' },
+        { field: 'lage', label: 'Lage' },
+        { field: 'hue', label: 'Hue' },
+        { field: 'kelvin', label: 'Temperatur' },
+        { field: 'val', label: 'Helligkeit' },
+        { field: 'sat', label: 'Sättigung' }
+    ];
+    
+    sortOptions.forEach(opt => {
+        const isActive = currentSort.field === opt.field ? 'active' : '';
+        html += `<div class="menu-item ${isActive}" data-sort="${opt.field}">${opt.label}</div>`;
+    });
+    html += `</div><div style="height: 10px;"></div>`;
+
+    // Filter Section
+    html += `<div class="menu-section-title">Filter:</div>`;
+    html += `<div class="dropdown-container">`;
+    
+    const filterCategories = [
+        { key: 'stadt', label: 'Stadt' },
+        { key: 'anfangsbuchstabe', label: 'Buchstabe' },
+        { key: 'linie', label: 'Linie' },
+        { key: 'umstieg', label: 'Umstieg' },
+        { key: 'stadtteil', label: 'Stadtteil' },
+        { key: 'sterne', label: 'Sterne' }
+    ];
+    
+    filterCategories.forEach(cat => {
+        const isActive = currentFilters[cat.key] ? 'active' : '';
+        const arrow = activeDropdown === cat.key ? 'v' : '>';
+        
+        html += `<div class="menu-item ${isActive}" data-toggle-dropdown="${cat.key}">${cat.label} ${currentFilters[cat.key] ? '(' + currentFilters[cat.key] + ')' : ''}</div>`;
+        
+        // Show dropdown items if active
+        if (activeDropdown === cat.key) {
+            html += `<div class="dropdown-container" style="margin-left: 10px; border-left: 1px solid yellow;">`;
+            
+            // Add a "clear" option if currently filtered
+            if (currentFilters[cat.key]) {
+                html += `<div class="menu-item" data-clear-filter="${cat.key}"><em>- Alle anzeigen -</em></div>`;
+            }
+            
+            filterOptions[cat.key].forEach(val => {
+                const isSelected = currentFilters[cat.key] === val ? 'active' : '';
+                html += `<div class="menu-item ${isSelected}" data-filter-key="${cat.key}" data-filter-val="${val}">${val}</div>`;
+            });
+            html += `</div>`;
+        }
+    });
+    
+    html += `</div>`; // end dropdown-container
+
+    if (animate) {
+        typewrite(menuOverlay, html, 600);
+    } else {
+        menuOverlay.innerHTML = html;
+    }
+}
+
+function applyFiltersAndSort() {
+    let result = [...originalData];
+
+    // Apply Filters
+    for (let key in currentFilters) {
+        const val = currentFilters[key];
+        if (!val) continue;
+        
+        result = result.filter(item => {
+            if (key === 'anfangsbuchstabe') return item.station && item.station.charAt(0).toUpperCase() === val;
+            if (key === 'linie') return item.linie && item.linie.includes(val);
+            if (key === 'umstieg') return item['Umsteigemöglichkeit'] && item['Umsteigemöglichkeit'].includes(val);
+            return item[key] == val;
+        });
+    }
+
+    // Apply Sorting
+    if (currentSort.field) {
+        result.sort((a, b) => {
+            let valA, valB;
+            switch(currentSort.field) {
+                case 'hue': 
+                    valA = parseInt(a.Schnitt_Hue || 0); 
+                    valB = parseInt(b.Schnitt_Hue || 0); 
+                    return currentSort.asc ? valA - valB : valB - valA;
+                case 'kelvin': 
+                    valA = parseInt(a.Farbtemperatur_Kelvin || 0); 
+                    valB = parseInt(b.Farbtemperatur_Kelvin || 0); 
+                    return currentSort.asc ? valA - valB : valB - valA;
+                case 'val': 
+                    valA = parseInt(a.Schnitt_Val || 0); 
+                    valB = parseInt(b.Schnitt_Val || 0); 
+                    return currentSort.asc ? valA - valB : valB - valA;
+                case 'sat': 
+                    valA = parseInt(a.Schnitt_Sat || 0); 
+                    valB = parseInt(b.Schnitt_Sat || 0); 
+                    return currentSort.asc ? valA - valB : valB - valA;
+                default: 
+                    valA = a[currentSort.field] || '';
+                    valB = b[currentSort.field] || '';
+                    return currentSort.asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+        });
+    }
+
+    carouselData = result;
+    currentIndex = 0; // reset to first slide after filtering/sorting
+    renderCarousel(carouselData);
+    
+    // Jump to the first slide
+    const carouselEl = document.getElementById('carousel');
+    if (carouselEl) {
+        carouselEl.scrollLeft = 0;
+    }
+}

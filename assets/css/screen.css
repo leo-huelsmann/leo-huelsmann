@@ -59,7 +59,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 15px;
-  /* Matches the spacing in the screenshot */
 }
 
 /* Image container */
@@ -193,10 +192,14 @@ body {
 }
 
 #nav-arrow-right {
-  transform: translate(0, -50%);
+  bottom: 20px;
+  right: 20px;
+  top: auto !important;
+  left: auto !important;
+  transform: none;
 }
 #nav-arrow-right:active {
-  transform: translate(0, -50%) scale(0.9);
+  transform: scale(0.9);
 }
 
 .ubahn-logo {
@@ -215,4 +218,68 @@ body {
   font-size: 25px;
   line-height: 1;
   padding-bottom: 2px;
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 100;
+}
+
+/* Menu Overlay Styles */
+.menu-overlay {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 25px); /* Position in the black strip to the right of the image */
+  background-color: transparent;
+  color: yellow;
+  z-index: 90;
+  padding-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  pointer-events: auto;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.menu-overlay::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.menu-section-title {
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-item {
+  cursor: pointer;
+  margin-bottom: 3px;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+  display: block;
+}
+
+.menu-item:hover {
+  opacity: 1;
+}
+
+.menu-item.active {
+  font-weight: bold;
+  opacity: 1;
+}
+
+.dropdown-container {
+  padding-left: 15px;
+  margin-top: 5px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sort-arrow {
+  display: inline-block;
+  cursor: pointer;
 }
