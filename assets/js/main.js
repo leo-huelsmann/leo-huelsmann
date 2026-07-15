@@ -113,9 +113,9 @@ function renderCarousel(data) {
         let leftColHTML = '';
         if (linie) leftColHTML += `<div>${linie}</div>`;
         if (umstieg) leftColHTML += `<div>${umstieg}</div>`;
-        if (linie || umstieg) leftColHTML += `<div style="height: 15px;"></div>`; // separator
+        if (linie || umstieg) leftColHTML += `<div style="height: 8px;"></div>`; // separator
         if (lage) leftColHTML += `<div>${lage.replace('#', '')}</div>`;
-        if (lage) leftColHTML += `<div style="height: 15px;"></div>`; // separator
+        if (lage) leftColHTML += `<div style="height: 8px;"></div>`; // separator
         if (extra && extra !== '#extra') leftColHTML += `<div>${extra.replace('#', '')}</div>`;
 
         html += `
@@ -141,7 +141,7 @@ function renderCarousel(data) {
                         <div class="footer-left-top uppercase">
                             ${leftColHTML}
                         </div>
-                        <div>${seite !== '#seite' ? seite : ''}</div>
+                        <div>${seite && seite !== '#seite' ? 'seite ' + seite : ''}</div>
                     </div>
                     <div class="footer-right">
                         <div class="block-text">

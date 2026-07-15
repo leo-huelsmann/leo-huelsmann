@@ -6,10 +6,10 @@
 
 body {
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1.5;
-  color: #000;
-  background-color: #fff;
+  color: yellow;
+  background-color: #000;
   overflow: hidden;
   letter-spacing: 0.05em;
 }
@@ -34,16 +34,20 @@ body {
   flex: 0 0 100vw;
   height: 100vh;
   scroll-snap-align: start;
-  padding: 35px 45px;
+  padding: 20px 45px;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: 30px;
+  gap: 15px;
+  --content-width: min(100%, (100vh - 200px) * 1.91);
 }
 
 /* Header layout */
 .header {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  width: var(--content-width);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .header-left {
@@ -52,7 +56,7 @@ body {
 }
 
 .header-right {
-  padding-left: 10%;
+  padding-left: 0;
   display: flex;
   flex-direction: column;
   gap: 15px; /* Matches the spacing in the screenshot */
@@ -60,7 +64,9 @@ body {
 
 /* Image container */
 .image-container {
-  width: 100%;
+  width: var(--content-width);
+  margin-left: auto;
+  margin-right: auto;
   height: 100%;
   overflow: hidden;
 }
@@ -68,7 +74,7 @@ body {
 .main-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -76,7 +82,10 @@ body {
 .footer {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  min-height: 150px;
+  min-height: 90px;
+  width: var(--content-width);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .footer-left {
@@ -88,11 +97,11 @@ body {
 .footer-left-top {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
 }
 
 .footer-right {
-  padding-left: 10%;
+  padding-left: 0;
   text-align: justify;
   display: flex;
   flex-direction: column;
@@ -105,5 +114,5 @@ body {
 }
 
 .block-text {
-  max-width: 60ch; /* Line length control for readability */
+  max-width: 100%; /* Line length control for readability */
 }
