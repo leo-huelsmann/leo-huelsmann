@@ -1,3 +1,6 @@
+let carouselData = [];
+let currentIndex = 0;
+
 // Load the CSV file from the root folder
 fetch('ubahn.csv')
     .then(response => {
@@ -15,6 +18,7 @@ fetch('ubahn.csv')
         }
         
         const data = parseCSV(text);
+        carouselData = data;
         renderCarousel(data);
     })
     .catch(error => {
@@ -120,7 +124,7 @@ function renderCarousel(data) {
 
         html += `
             <div class="slide">
-                <div class="header">
+                <div class="header slide-placeholder">
                     <div class="header-left">
                         <div>${stadt}</div>
                         <div>${station}</div>
@@ -136,7 +140,7 @@ function renderCarousel(data) {
                     <img class="main-image" src="${image}" alt="${station}" loading="lazy">
                 </div>
                 
-                <div class="footer">
+                <div class="footer slide-placeholder">
                     <div class="footer-left">
                         <div class="footer-left-top uppercase">
                             ${leftColHTML}
@@ -154,4 +158,157 @@ function renderCarousel(data) {
     });
 
     carousel.innerHTML = html;
+    adjustLayoutWidths();
+    updateFixedText(0);
 }
+
+function adjustLayoutWidths() {
+    const carousel = document.getElementById('carousel');
+    if (!carousel) return;
+    const slideWidth = carousel.clientWidth;
+    const scrollPosition = carousel.scrollLeft;
+    const index = Math.round(scrollPosition / slideWidth);
+
+    const slides = document.querySelectorAll('.slide');
+    const activeSlide = slides[index];
+    if (!activeSlide) return;
+
+    const img = activeSlide.querySelector('.main-image');
+    const fixedHeader = document.getElementById('fixed-header');
+    const fixedFooter = document.getElementById('fixed-footer');
+    if (img && fixedHeader && fixedFooter) {
+        const applyWidth = () => {
+            const rect = img.getBoundingClientRect();
+            const width = rect.width;
+            if (width > 0) {
+                const leftPos = (window.innerWidth - width) / 2;
+                fixedHeader.style.width = `${width}px`;
+                fixedHeader.style.left = `${leftPos}px`;
+
+                fixedFooter.style.width = `${width}px`;
+                fixedFooter.style.left = `${leftPos}px`;
+            }
+        };
+
+        if (img.complete) {
+            applyWidth();
+        } else {
+            img.onload = applyWidth;
+        }
+    }
+}
+
+function typewrite(element, text, duration = 400) {
+    if (!element) return;
+    
+    if (element.typewriterRequest) {
+        cancelAnimationFrame(element.typewriterRequest);
+    }
+    
+    element.innerHTML = '';
+    if (!text) return;
+    
+    const startTime = performance.now();
+    
+    function animate(currentTime) {
+        const elapsedTime = currentTime - startTime;
+        const progress = Math.min(elapsedTime / duration, 1);
+        
+        const charCount = Math.floor(progress * text.length);
+        
+        let renderedText = '';
+        let i = 0;
+        let count = 0;
+        
+        while (i < text.length && count < charCount) {
+            if (text[i] === '<') {
+                const closeIndex = text.indexOf('>', i);
+                if (closeIndex !== -1) {
+                    renderedText += text.substring(i, closeIndex + 1);
+                    i = closeIndex + 1;
+                    continue;
+                }
+            }
+            renderedText += text[i];
+            i++;
+            count++;
+        }
+        
+        element.innerHTML = renderedText;
+        
+        if (progress < 1) {
+            element.typewriterRequest = requestAnimationFrame(animate);
+        } else {
+            element.typewriterRequest = null;
+        }
+    }
+    
+    element.typewriterRequest = requestAnimationFrame(animate);
+}
+
+function updateFixedText(index) {
+    if (!carouselData || carouselData.length === 0 || index >= carouselData.length) return;
+    const item = carouselData[index];
+    
+    const D_SHORT = 500;
+    const D_LONG = 800;
+    
+    typewrite(document.getElementById('fh-stadt'), item.stadt || '', D_SHORT);
+    typewrite(document.getElementById('fh-station'), item.station || '', D_SHORT);
+    
+    typewrite(document.getElementById('fh-stadtteil'), item.stadtteil || '', D_SHORT);
+    let coords = item.Koordinaten || '';
+    coords = coords.replace(/ N /, ' N<br>');
+    typewrite(document.getElementById('fh-coords'), coords, D_SHORT);
+    typewrite(document.getElementById('fh-eröffnung'), item['Eröffnung'] || '', D_SHORT);
+    
+    const linie = item.linie || '';
+    const umstieg = item['Umsteigemöglichkeit'] || '';
+    const lage = item.lage || '';
+    const extra = item.extra || '';
+    
+    let leftColHTML = '';
+    if (linie) leftColHTML += `<div id="ff-linie">&nbsp;</div>`;
+    if (umstieg) leftColHTML += `<div id="ff-umstieg">&nbsp;</div>`;
+    if (linie || umstieg) leftColHTML += `<div style="height: 8px;"></div>`;
+    if (lage) leftColHTML += `<div id="ff-lage">&nbsp;</div>`;
+    if (lage) leftColHTML += `<div style="height: 8px;"></div>`;
+    if (extra && extra !== '#extra') leftColHTML += `<div id="ff-extra">&nbsp;</div>`;
+    
+    document.getElementById('ff-left-top').innerHTML = leftColHTML;
+    
+    if (linie) typewrite(document.getElementById('ff-linie'), linie, D_SHORT);
+    if (umstieg) typewrite(document.getElementById('ff-umstieg'), umstieg, D_SHORT);
+    if (lage) typewrite(document.getElementById('ff-lage'), lage.replace('#', ''), D_SHORT);
+    if (extra && extra !== '#extra') typewrite(document.getElementById('ff-extra'), extra.replace('#', ''), D_SHORT);
+    
+    const seite = item.seite || '';
+    const seiteText = seite && seite !== '#seite' ? 'seite ' + seite : '';
+    
+    typewrite(document.getElementById('ff-seite'), seiteText, D_SHORT);
+    
+    const geschichte = item.geschichte || '';
+    const sterne = item.sterne || '';
+    const review = item.review || '';
+    const name = item.name || '';
+    const reviewText = `${geschichte} ${sterne} „${review}“ – ${name}`;
+    
+    typewrite(document.getElementById('ff-review'), reviewText, D_LONG);
+}
+
+const carousel = document.getElementById('carousel');
+if (carousel) {
+    carousel.addEventListener('scroll', () => {
+        const slideWidth = carousel.clientWidth;
+        const scrollPosition = carousel.scrollLeft;
+        const newIndex = Math.round(scrollPosition / slideWidth);
+        if (newIndex !== currentIndex && newIndex >= 0 && newIndex < carouselData.length) {
+            currentIndex = newIndex;
+            updateFixedText(currentIndex);
+            adjustLayoutWidths();
+        }
+    });
+}
+
+window.addEventListener('resize', adjustLayoutWidths);
+window.addEventListener('load', adjustLayoutWidths);

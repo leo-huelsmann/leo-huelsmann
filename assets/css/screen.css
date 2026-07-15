@@ -38,14 +38,12 @@ body {
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 15px;
-  --content-width: min(100%, (100vh - 200px) * 1.91);
 }
 
 /* Header layout */
 .header {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  width: var(--content-width);
   margin-left: auto;
   margin-right: auto;
 }
@@ -64,18 +62,19 @@ body {
 
 /* Image container */
 .image-container {
-  width: var(--content-width);
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
   height: 100%;
   overflow: hidden;
+  padding-bottom: 35px;
 }
 
 .main-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
   display: block;
+  margin: 0 auto;
 }
 
 /* Footer layout */
@@ -83,7 +82,6 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   min-height: 90px;
-  width: var(--content-width);
   margin-left: auto;
   margin-right: auto;
 }
@@ -105,7 +103,7 @@ body {
   text-align: justify;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 /* Utility classes */
@@ -115,4 +113,47 @@ body {
 
 .block-text {
   max-width: 100%; /* Line length control for readability */
+}
+
+.slide-placeholder {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fixed-header {
+  position: fixed;
+  top: 20px;
+  z-index: 10;
+  pointer-events: none;
+  background-color: transparent;
+}
+
+.fixed-footer {
+  position: fixed;
+  bottom: 20px;
+  z-index: 10;
+  pointer-events: none;
+  background-color: transparent;
+}
+
+/* Prevent layout shifts and text jumping during typewriter animations */
+#fh-stadt, #fh-station, #fh-stadtteil, #fh-eröffnung, #ff-seite {
+  min-height: 1.5em;
+  display: block;
+}
+
+#fh-coords {
+  min-height: 3em;
+  display: block;
+}
+
+#ff-left-top div:not([style*="height"]) {
+  min-height: 1.5em;
+  display: block;
+}
+
+#ff-review {
+  min-height: 4.5em;
+  display: block;
 }
