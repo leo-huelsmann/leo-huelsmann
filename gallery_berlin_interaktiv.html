@@ -1,0 +1,2049 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Interaktive Foto-Farbanalyse</title>
+    <style>
+        :root {
+            --bg-color: #0f0f11;
+            --card-bg: #1a1a1e;
+            --text-color: #efefef;
+            --accent-color: #3a86ff;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            position: sticky;
+            top: 0;
+            background: rgba(26, 26, 30, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 15px 30px;
+            border-bottom: 1px solid #2a2a30;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        h1 { margin: 0; font-size: 18px; font-weight: 400; letter-spacing: -0.5px; }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        label { font-size: 13px; color: #aaa; }
+        select, button {
+            background: #2a2a30;
+            color: #fff;
+            border: 1px solid #3a3a42;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            outline: none;
+        }
+        select:focus, button:hover { border-color: var(--accent-color); }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        .card:hover { transform: translateY(-4px); }
+        .img-container {
+            width: 100%;
+            height: 180px;
+            background: #000;
+        }
+        img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .info { padding: 12px; font-size: 11px; color: #aaa; }
+        .filename {
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 6px;
+        }
+        .meta-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 4px;
+        }
+        .color-preview {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1 id="title-text">Foto-Farbanalyse</h1>
+        <div class="controls">
+            <div>
+                <label for="sortSelect">Sortieren nach: </label>
+                <select id="sortSelect" onchange="renderGallery()">
+                    <option value="hue">Regenbogen (Hue 0-360°)</option>
+                    <option value="kelvin_warm">Farbtemperatur (Warm zuerst)</option>
+                    <option value="kelvin_cold">Farbtemperatur (Kalt zuerst)</option>
+                    <option value="val">Helligkeit (Dunkel bis Hell)</option>
+                    <option value="val_desc">Helligkeit (Hell bis Dunkel)</option>
+                    <option value="sat">Sättigung (Knallig zuerst)</option>
+                    <option value="filename">Dateiname</option>
+                </select>
+            </div>
+            <div class="checkbox-container">
+                <input type="checkbox" id="hideMono" onchange="renderGallery()">
+                <label for="hideMono">Schwarz-Weiß / Grau ausblenden</label>
+            </div>
+        </div>
+    </header>
+
+    <div class="gallery" id="galleryGrid"></div>
+
+    <script>
+        // Hier injiziert Python das JSON-Array der Bilddaten
+        const photos = [
+  {
+    "filename": "b-167.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-167.jpg",
+    "hex": "#7b7870",
+    "hue": 43,
+    "sat": 8,
+    "val": 48,
+    "kelvin": 6142
+  },
+  {
+    "filename": "b-173.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-173.jpg",
+    "hex": "#9b8c55",
+    "hue": 47,
+    "sat": 45,
+    "val": 60,
+    "kelvin": 4894
+  },
+  {
+    "filename": "b-198.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-198.jpg",
+    "hex": "#b3a543",
+    "hue": 52,
+    "sat": 62,
+    "val": 70,
+    "kelvin": 4484
+  },
+  {
+    "filename": "b-013.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-013.jpg",
+    "hex": "#716a62",
+    "hue": 32,
+    "sat": 13,
+    "val": 44,
+    "kelvin": 5970
+  },
+  {
+    "filename": "b-007.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-007.jpg",
+    "hex": "#9b6a4d",
+    "hue": 22,
+    "sat": 50,
+    "val": 60,
+    "kelvin": 4408
+  },
+  {
+    "filename": "b-006.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-006.jpg",
+    "hex": "#a48d22",
+    "hue": 49,
+    "sat": 79,
+    "val": 64,
+    "kelvin": 4040
+  },
+  {
+    "filename": "b-012.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-012.jpg",
+    "hex": "#aa8b29",
+    "hue": 45,
+    "sat": 75,
+    "val": 66,
+    "kelvin": 4033
+  },
+  {
+    "filename": "b-204.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-204.jpg",
+    "hex": "#87715c",
+    "hue": 29,
+    "sat": 31,
+    "val": 52,
+    "kelvin": 5232
+  },
+  {
+    "filename": "b-199.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-199.jpg",
+    "hex": "#a59f8a",
+    "hue": 46,
+    "sat": 16,
+    "val": 64,
+    "kelvin": 5858
+  },
+  {
+    "filename": "b-172.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-172.jpg",
+    "hex": "#a0b48e",
+    "hue": 91,
+    "sat": 21,
+    "val": 70,
+    "kelvin": 6054
+  },
+  {
+    "filename": "b-166.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-166.jpg",
+    "hex": "#5d6674",
+    "hue": 216,
+    "sat": 19,
+    "val": 45,
+    "kelvin": 7551
+  },
+  {
+    "filename": "b-158.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-158.jpg",
+    "hex": "#8b8077",
+    "hue": 27,
+    "sat": 14,
+    "val": 54,
+    "kelvin": 5924
+  },
+  {
+    "filename": "b-170.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-170.jpg",
+    "hex": "#8d7d62",
+    "hue": 37,
+    "sat": 30,
+    "val": 55,
+    "kelvin": 5322
+  },
+  {
+    "filename": "b-164.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-164.jpg",
+    "hex": "#bb9f63",
+    "hue": 40,
+    "sat": 47,
+    "val": 73,
+    "kelvin": 4775
+  },
+  {
+    "filename": "b-038.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-038.jpg",
+    "hex": "#d0c4b2",
+    "hue": 36,
+    "sat": 14,
+    "val": 81,
+    "kelvin": 5927
+  },
+  {
+    "filename": "b-004.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-004.jpg",
+    "hex": "#8d806a",
+    "hue": 37,
+    "sat": 24,
+    "val": 55,
+    "kelvin": 5531
+  },
+  {
+    "filename": "b-010.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-010.jpg",
+    "hex": "#c6a88a",
+    "hue": 30,
+    "sat": 30,
+    "val": 77,
+    "kelvin": 5296
+  },
+  {
+    "filename": "b-011.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-011.jpg",
+    "hex": "#4b483d",
+    "hue": 47,
+    "sat": 18,
+    "val": 29,
+    "kelvin": 5773
+  },
+  {
+    "filename": "b-005.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-005.jpg",
+    "hex": "#ac703e",
+    "hue": 27,
+    "sat": 63,
+    "val": 67,
+    "kelvin": 3960
+  },
+  {
+    "filename": "b-039.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-039.jpg",
+    "hex": "#73695c",
+    "hue": 33,
+    "sat": 20,
+    "val": 45,
+    "kelvin": 5708
+  },
+  {
+    "filename": "b-165.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-165.jpg",
+    "hex": "#98a09b",
+    "hue": 142,
+    "sat": 5,
+    "val": 62,
+    "kelvin": 6558
+  },
+  {
+    "filename": "b-171.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-171.jpg",
+    "hex": "#646258",
+    "hue": 50,
+    "sat": 12,
+    "val": 39,
+    "kelvin": 6023
+  },
+  {
+    "filename": "b-159.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-159.jpg",
+    "hex": "#b1b49a",
+    "hue": 66,
+    "sat": 14,
+    "val": 70,
+    "kelvin": 5989
+  },
+  {
+    "filename": "b-175.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-175.jpg",
+    "hex": "#a7a299",
+    "hue": 38,
+    "sat": 8,
+    "val": 65,
+    "kelvin": 6164
+  },
+  {
+    "filename": "b-161.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-161.jpg",
+    "hex": "#d28135",
+    "hue": 29,
+    "sat": 74,
+    "val": 82,
+    "kelvin": 3614
+  },
+  {
+    "filename": "b-149.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-149.jpg",
+    "hex": "#d5bf9a",
+    "hue": 37,
+    "sat": 27,
+    "val": 83,
+    "kelvin": 5424
+  },
+  {
+    "filename": "b-203.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-203.jpg",
+    "hex": "#ccc2b5",
+    "hue": 33,
+    "sat": 11,
+    "val": 80,
+    "kelvin": 6050
+  },
+  {
+    "filename": "b-001.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-001.jpg",
+    "hex": "#a38167",
+    "hue": 26,
+    "sat": 36,
+    "val": 63,
+    "kelvin": 5014
+  },
+  {
+    "filename": "b-015.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-015.jpg",
+    "hex": "#d34e18",
+    "hue": 17,
+    "sat": 88,
+    "val": 82,
+    "kelvin": 2544
+  },
+  {
+    "filename": "b-029.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-029.jpg",
+    "hex": "#8e887f",
+    "hue": 35,
+    "sat": 10,
+    "val": 55,
+    "kelvin": 6078
+  },
+  {
+    "filename": "b-028.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-028.jpg",
+    "hex": "#a3a594",
+    "hue": 67,
+    "sat": 10,
+    "val": 64,
+    "kelvin": 6129
+  },
+  {
+    "filename": "b-014.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-014.jpg",
+    "hex": "#c44716",
+    "hue": 16,
+    "sat": 88,
+    "val": 76,
+    "kelvin": 2513
+  },
+  {
+    "filename": "b-202.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-202.jpg",
+    "hex": "#463c2d",
+    "hue": 35,
+    "sat": 35,
+    "val": 27,
+    "kelvin": 5124
+  },
+  {
+    "filename": "b-148.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-148.jpg",
+    "hex": "#c3bbb0",
+    "hue": 34,
+    "sat": 9,
+    "val": 76,
+    "kelvin": 6111
+  },
+  {
+    "filename": "b-160.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-160.jpg",
+    "hex": "#ab632e",
+    "hue": 25,
+    "sat": 73,
+    "val": 67,
+    "kelvin": 3555
+  },
+  {
+    "filename": "b-174.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-174.jpg",
+    "hex": "#857d72",
+    "hue": 34,
+    "sat": 14,
+    "val": 52,
+    "kelvin": 5931
+  },
+  {
+    "filename": "b-162.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-162.jpg",
+    "hex": "#b2ab9f",
+    "hue": 37,
+    "sat": 10,
+    "val": 69,
+    "kelvin": 6074
+  },
+  {
+    "filename": "b-176.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-176.jpg",
+    "hex": "#d0bfa4",
+    "hue": 36,
+    "sat": 21,
+    "val": 81,
+    "kelvin": 5668
+  },
+  {
+    "filename": "b-189.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-189.jpg",
+    "hex": "#a1917d",
+    "hue": 33,
+    "sat": 22,
+    "val": 63,
+    "kelvin": 5615
+  },
+  {
+    "filename": "b-200.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-200.jpg",
+    "hex": "#aca868",
+    "hue": 56,
+    "sat": 39,
+    "val": 67,
+    "kelvin": 5125
+  },
+  {
+    "filename": "b-016.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-016.jpg",
+    "hex": "#a78756",
+    "hue": 36,
+    "sat": 48,
+    "val": 65,
+    "kelvin": 4676
+  },
+  {
+    "filename": "b-002.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-002.jpg",
+    "hex": "#ad9f7f",
+    "hue": 41,
+    "sat": 26,
+    "val": 67,
+    "kelvin": 5477
+  },
+  {
+    "filename": "b-003.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-003.jpg",
+    "hex": "#84806b",
+    "hue": 50,
+    "sat": 18,
+    "val": 51,
+    "kelvin": 5767
+  },
+  {
+    "filename": "b-017.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-017.jpg",
+    "hex": "#a15a37",
+    "hue": 19,
+    "sat": 65,
+    "val": 63,
+    "kelvin": 3670
+  },
+  {
+    "filename": "b-201.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-201.jpg",
+    "hex": "#847a94",
+    "hue": 263,
+    "sat": 17,
+    "val": 58,
+    "kelvin": 7168
+  },
+  {
+    "filename": "b-188.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-188.jpg",
+    "hex": "#a19989",
+    "hue": 40,
+    "sat": 14,
+    "val": 63,
+    "kelvin": 5909
+  },
+  {
+    "filename": "b-177.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-177.jpg",
+    "hex": "#a18f62",
+    "hue": 42,
+    "sat": 39,
+    "val": 63,
+    "kelvin": 5051
+  },
+  {
+    "filename": "b-163.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-163.jpg",
+    "hex": "#ccc6bb",
+    "hue": 38,
+    "sat": 8,
+    "val": 80,
+    "kelvin": 6166
+  },
+  {
+    "filename": "b-138.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-138.jpg",
+    "hex": "#d0caba",
+    "hue": 43,
+    "sat": 10,
+    "val": 81,
+    "kelvin": 6078
+  },
+  {
+    "filename": "b-104.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-104.jpg",
+    "hex": "#bcb2a1",
+    "hue": 37,
+    "sat": 14,
+    "val": 73,
+    "kelvin": 5930
+  },
+  {
+    "filename": "b-110.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-110.jpg",
+    "hex": "#8b8880",
+    "hue": 43,
+    "sat": 7,
+    "val": 54,
+    "kelvin": 6182
+  },
+  {
+    "filename": "b-058.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-058.jpg",
+    "hex": "#68654c",
+    "hue": 53,
+    "sat": 26,
+    "val": 40,
+    "kelvin": 5498
+  },
+  {
+    "filename": "b-070.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-070.jpg",
+    "hex": "#ce5723",
+    "hue": 18,
+    "sat": 83,
+    "val": 80,
+    "kelvin": 2839
+  },
+  {
+    "filename": "b-064.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-064.jpg",
+    "hex": "#a6a48c",
+    "hue": 55,
+    "sat": 15,
+    "val": 65,
+    "kelvin": 5889
+  },
+  {
+    "filename": "b-065.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-065.jpg",
+    "hex": "#72706a",
+    "hue": 44,
+    "sat": 7,
+    "val": 44,
+    "kelvin": 6218
+  },
+  {
+    "filename": "b-071.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-071.jpg",
+    "hex": "#b2aca0",
+    "hue": 40,
+    "sat": 10,
+    "val": 69,
+    "kelvin": 6096
+  },
+  {
+    "filename": "b-059.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-059.jpg",
+    "hex": "#b38f41",
+    "hue": 41,
+    "sat": 63,
+    "val": 70,
+    "kelvin": 4267
+  },
+  {
+    "filename": "b-111.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-111.jpg",
+    "hex": "#b0a13e",
+    "hue": 52,
+    "sat": 64,
+    "val": 69,
+    "kelvin": 4425
+  },
+  {
+    "filename": "b-105.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-105.jpg",
+    "hex": "#b9b0a1",
+    "hue": 37,
+    "sat": 12,
+    "val": 72,
+    "kelvin": 5984
+  },
+  {
+    "filename": "b-139.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-139.jpg",
+    "hex": "#968872",
+    "hue": 36,
+    "sat": 24,
+    "val": 58,
+    "kelvin": 5560
+  },
+  {
+    "filename": "b-113.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-113.jpg",
+    "hex": "#4c5a6c",
+    "hue": 213,
+    "sat": 29,
+    "val": 42,
+    "kelvin": 8276
+  },
+  {
+    "filename": "b-107.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-107.jpg",
+    "hex": "#d9cdb9",
+    "hue": 37,
+    "sat": 14,
+    "val": 85,
+    "kelvin": 5915
+  },
+  {
+    "filename": "b-067.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-067.jpg",
+    "hex": "#8f8a51",
+    "hue": 55,
+    "sat": 43,
+    "val": 56,
+    "kelvin": 5009
+  },
+  {
+    "filename": "b-073.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-073.jpg",
+    "hex": "#536965",
+    "hue": 169,
+    "sat": 20,
+    "val": 41,
+    "kelvin": 7178
+  },
+  {
+    "filename": "b-098.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-098.jpg",
+    "hex": "#8d8274",
+    "hue": 33,
+    "sat": 17,
+    "val": 55,
+    "kelvin": 5796
+  },
+  {
+    "filename": "b-099.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-099.jpg",
+    "hex": "#978e78",
+    "hue": 42,
+    "sat": 20,
+    "val": 59,
+    "kelvin": 5700
+  },
+  {
+    "filename": "b-072.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-072.jpg",
+    "hex": "#afa68e",
+    "hue": 43,
+    "sat": 18,
+    "val": 68,
+    "kelvin": 5763
+  },
+  {
+    "filename": "b-066.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-066.jpg",
+    "hex": "#b12e28",
+    "hue": 2,
+    "sat": 77,
+    "val": 69,
+    "kelvin": 2210
+  },
+  {
+    "filename": "b-106.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-106.jpg",
+    "hex": "#d5b587",
+    "hue": 35,
+    "sat": 36,
+    "val": 83,
+    "kelvin": 5087
+  },
+  {
+    "filename": "b-112.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-112.jpg",
+    "hex": "#d99d0d",
+    "hue": 42,
+    "sat": 94,
+    "val": 85,
+    "kelvin": 3509
+  },
+  {
+    "filename": "b-116.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-116.jpg",
+    "hex": "#81664b",
+    "hue": 30,
+    "sat": 41,
+    "val": 50,
+    "kelvin": 4849
+  },
+  {
+    "filename": "b-102.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-102.jpg",
+    "hex": "#90816e",
+    "hue": 33,
+    "sat": 23,
+    "val": 56,
+    "kelvin": 5567
+  },
+  {
+    "filename": "b-062.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-062.jpg",
+    "hex": "#e6a31d",
+    "hue": 39,
+    "sat": 87,
+    "val": 90,
+    "kelvin": 3592
+  },
+  {
+    "filename": "b-076.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-076.jpg",
+    "hex": "#b2b899",
+    "hue": 71,
+    "sat": 16,
+    "val": 72,
+    "kelvin": 5953
+  },
+  {
+    "filename": "b-089.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-089.jpg",
+    "hex": "#8b7e5b",
+    "hue": 43,
+    "sat": 34,
+    "val": 54,
+    "kelvin": 5209
+  },
+  {
+    "filename": "b-088.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-088.jpg",
+    "hex": "#817d72",
+    "hue": 43,
+    "sat": 11,
+    "val": 50,
+    "kelvin": 6037
+  },
+  {
+    "filename": "b-077.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-077.jpg",
+    "hex": "#cab60e",
+    "hue": 53,
+    "sat": 93,
+    "val": 79,
+    "kelvin": 3863
+  },
+  {
+    "filename": "b-063.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-063.jpg",
+    "hex": "#79746d",
+    "hue": 35,
+    "sat": 9,
+    "val": 47,
+    "kelvin": 6104
+  },
+  {
+    "filename": "b-103.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-103.jpg",
+    "hex": "#66514a",
+    "hue": 14,
+    "sat": 27,
+    "val": 40,
+    "kelvin": 5352
+  },
+  {
+    "filename": "b-117.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-117.jpg",
+    "hex": "#987e6b",
+    "hue": 25,
+    "sat": 29,
+    "val": 59,
+    "kelvin": 5303
+  },
+  {
+    "filename": "b-101.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-101.jpg",
+    "hex": "#a2a6ab",
+    "hue": 213,
+    "sat": 5,
+    "val": 67,
+    "kelvin": 6730
+  },
+  {
+    "filename": "b-115.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-115.jpg",
+    "hex": "#95918a",
+    "hue": 38,
+    "sat": 7,
+    "val": 58,
+    "kelvin": 6204
+  },
+  {
+    "filename": "b-129.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-129.jpg",
+    "hex": "#807451",
+    "hue": 44,
+    "sat": 36,
+    "val": 50,
+    "kelvin": 5142
+  },
+  {
+    "filename": "b-075.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-075.jpg",
+    "hex": "#b5a69f",
+    "hue": 19,
+    "sat": 12,
+    "val": 70,
+    "kelvin": 6013
+  },
+  {
+    "filename": "b-061.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-061.jpg",
+    "hex": "#71593e",
+    "hue": 31,
+    "sat": 45,
+    "val": 44,
+    "kelvin": 4744
+  },
+  {
+    "filename": "b-049.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-049.jpg",
+    "hex": "#c3b097",
+    "hue": 34,
+    "sat": 22,
+    "val": 76,
+    "kelvin": 5609
+  },
+  {
+    "filename": "b-048.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-048.jpg",
+    "hex": "#a2603c",
+    "hue": 21,
+    "sat": 62,
+    "val": 63,
+    "kelvin": 3837
+  },
+  {
+    "filename": "b-060.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-060.jpg",
+    "hex": "#a3875b",
+    "hue": 36,
+    "sat": 44,
+    "val": 63,
+    "kelvin": 4829
+  },
+  {
+    "filename": "b-074.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-074.jpg",
+    "hex": "#ccbca3",
+    "hue": 36,
+    "sat": 20,
+    "val": 80,
+    "kelvin": 5708
+  },
+  {
+    "filename": "b-128.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-128.jpg",
+    "hex": "#727867",
+    "hue": 81,
+    "sat": 14,
+    "val": 47,
+    "kelvin": 6110
+  },
+  {
+    "filename": "b-114.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-114.jpg",
+    "hex": "#c3b5a3",
+    "hue": 33,
+    "sat": 16,
+    "val": 76,
+    "kelvin": 5848
+  },
+  {
+    "filename": "b-100.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-100.jpg",
+    "hex": "#b99521",
+    "hue": 45,
+    "sat": 82,
+    "val": 72,
+    "kelvin": 3887
+  },
+  {
+    "filename": "b-119.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-119.jpg",
+    "hex": "#aaa79b",
+    "hue": 48,
+    "sat": 8,
+    "val": 66,
+    "kelvin": 6146
+  },
+  {
+    "filename": "b-125.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-125.jpg",
+    "hex": "#cd9337",
+    "hue": 36,
+    "sat": 73,
+    "val": 80,
+    "kelvin": 3893
+  },
+  {
+    "filename": "b-131.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-131.jpg",
+    "hex": "#bbaa91",
+    "hue": 35,
+    "sat": 22,
+    "val": 73,
+    "kelvin": 5616
+  },
+  {
+    "filename": "b-079.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-079.jpg",
+    "hex": "#aa8438",
+    "hue": 40,
+    "sat": 67,
+    "val": 66,
+    "kelvin": 4148
+  },
+  {
+    "filename": "b-051.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-051.jpg",
+    "hex": "#776353",
+    "hue": 26,
+    "sat": 30,
+    "val": 46,
+    "kelvin": 5283
+  },
+  {
+    "filename": "b-045.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-045.jpg",
+    "hex": "#a99e75",
+    "hue": 47,
+    "sat": 30,
+    "val": 66,
+    "kelvin": 5351
+  },
+  {
+    "filename": "b-092.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-092.jpg",
+    "hex": "#a48a7c",
+    "hue": 20,
+    "sat": 24,
+    "val": 64,
+    "kelvin": 5505
+  },
+  {
+    "filename": "b-086.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-086.jpg",
+    "hex": "#db9f6c",
+    "hue": 27,
+    "sat": 50,
+    "val": 85,
+    "kelvin": 4478
+  },
+  {
+    "filename": "b-087.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-087.jpg",
+    "hex": "#847a74",
+    "hue": 22,
+    "sat": 12,
+    "val": 51,
+    "kelvin": 6015
+  },
+  {
+    "filename": "b-093.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-093.jpg",
+    "hex": "#c8a678",
+    "hue": 34,
+    "sat": 40,
+    "val": 78,
+    "kelvin": 4958
+  },
+  {
+    "filename": "b-044.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-044.jpg",
+    "hex": "#bb9b63",
+    "hue": 38,
+    "sat": 47,
+    "val": 73,
+    "kelvin": 4746
+  },
+  {
+    "filename": "b-050.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-050.jpg",
+    "hex": "#9c8871",
+    "hue": 32,
+    "sat": 27,
+    "val": 61,
+    "kelvin": 5411
+  },
+  {
+    "filename": "b-078.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-078.jpg",
+    "hex": "#ad7356",
+    "hue": 19,
+    "sat": 50,
+    "val": 67,
+    "kelvin": 4370
+  },
+  {
+    "filename": "b-130.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-130.jpg",
+    "hex": "#b0a390",
+    "hue": 35,
+    "sat": 18,
+    "val": 69,
+    "kelvin": 5780
+  },
+  {
+    "filename": "b-124.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-124.jpg",
+    "hex": "#caae82",
+    "hue": 36,
+    "sat": 35,
+    "val": 79,
+    "kelvin": 5131
+  },
+  {
+    "filename": "b-118.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-118.jpg",
+    "hex": "#8d8477",
+    "hue": 35,
+    "sat": 15,
+    "val": 55,
+    "kelvin": 5880
+  },
+  {
+    "filename": "b-132.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-132.jpg",
+    "hex": "#c1c0a7",
+    "hue": 57,
+    "sat": 13,
+    "val": 75,
+    "kelvin": 5969
+  },
+  {
+    "filename": "b-126.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-126.jpg",
+    "hex": "#b7a993",
+    "hue": 36,
+    "sat": 19,
+    "val": 71,
+    "kelvin": 5724
+  },
+  {
+    "filename": "b-046.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-046.jpg",
+    "hex": "#a5b292",
+    "hue": 84,
+    "sat": 17,
+    "val": 69,
+    "kelvin": 6044
+  },
+  {
+    "filename": "b-052.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-052.jpg",
+    "hex": "#bcaf9a",
+    "hue": 37,
+    "sat": 18,
+    "val": 73,
+    "kelvin": 5785
+  },
+  {
+    "filename": "b-085.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-085.jpg",
+    "hex": "#cfc5a0",
+    "hue": 47,
+    "sat": 22,
+    "val": 81,
+    "kelvin": 5628
+  },
+  {
+    "filename": "b-091.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-091.jpg",
+    "hex": "#857055",
+    "hue": 33,
+    "sat": 36,
+    "val": 52,
+    "kelvin": 5096
+  },
+  {
+    "filename": "b-090.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-090.jpg",
+    "hex": "#4c5e5a",
+    "hue": 166,
+    "sat": 19,
+    "val": 36,
+    "kelvin": 7078
+  },
+  {
+    "filename": "b-084.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-084.jpg",
+    "hex": "#98b188",
+    "hue": 96,
+    "sat": 23,
+    "val": 69,
+    "kelvin": 6078
+  },
+  {
+    "filename": "b-053.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-053.jpg",
+    "hex": "#dad1bd",
+    "hue": 41,
+    "sat": 13,
+    "val": 85,
+    "kelvin": 5972
+  },
+  {
+    "filename": "b-047.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-047.jpg",
+    "hex": "#d1ab0d",
+    "hue": 48,
+    "sat": 93,
+    "val": 81,
+    "kelvin": 3705
+  },
+  {
+    "filename": "b-127.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-127.jpg",
+    "hex": "#82a387",
+    "hue": 129,
+    "sat": 20,
+    "val": 63,
+    "kelvin": 6531
+  },
+  {
+    "filename": "b-133.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-133.jpg",
+    "hex": "#a89d8f",
+    "hue": 33,
+    "sat": 14,
+    "val": 65,
+    "kelvin": 5908
+  },
+  {
+    "filename": "b-137.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-137.jpg",
+    "hex": "#959186",
+    "hue": 43,
+    "sat": 10,
+    "val": 58,
+    "kelvin": 6097
+  },
+  {
+    "filename": "b-123.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-123.jpg",
+    "hex": "#dbac4a",
+    "hue": 40,
+    "sat": 66,
+    "val": 85,
+    "kelvin": 4184
+  },
+  {
+    "filename": "b-043.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-043.jpg",
+    "hex": "#bdb09f",
+    "hue": 33,
+    "sat": 15,
+    "val": 74,
+    "kelvin": 5869
+  },
+  {
+    "filename": "b-057.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-057.jpg",
+    "hex": "#88a660",
+    "hue": 85,
+    "sat": 42,
+    "val": 65,
+    "kelvin": 5550
+  },
+  {
+    "filename": "b-080.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-080.jpg",
+    "hex": "#c68c23",
+    "hue": 38,
+    "sat": 82,
+    "val": 77,
+    "kelvin": 3683
+  },
+  {
+    "filename": "b-094.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-094.jpg",
+    "hex": "#806e51",
+    "hue": 37,
+    "sat": 36,
+    "val": 50,
+    "kelvin": 5094
+  },
+  {
+    "filename": "b-095.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-095.jpg",
+    "hex": "#7d6d53",
+    "hue": 37,
+    "sat": 33,
+    "val": 49,
+    "kelvin": 5207
+  },
+  {
+    "filename": "b-081.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-081.jpg",
+    "hex": "#9f9f96",
+    "hue": 60,
+    "sat": 5,
+    "val": 62,
+    "kelvin": 6268
+  },
+  {
+    "filename": "b-056.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-056.jpg",
+    "hex": "#716853",
+    "hue": 42,
+    "sat": 26,
+    "val": 44,
+    "kelvin": 5480
+  },
+  {
+    "filename": "b-042.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-042.jpg",
+    "hex": "#b8ca97",
+    "hue": 81,
+    "sat": 25,
+    "val": 79,
+    "kelvin": 5835
+  },
+  {
+    "filename": "b-122.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-122.jpg",
+    "hex": "#b9b5af",
+    "hue": 36,
+    "sat": 5,
+    "val": 72,
+    "kelvin": 6284
+  },
+  {
+    "filename": "b-136.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-136.jpg",
+    "hex": "#8e7e6e",
+    "hue": 30,
+    "sat": 22,
+    "val": 55,
+    "kelvin": 5602
+  },
+  {
+    "filename": "b-120.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-120.jpg",
+    "hex": "#bca893",
+    "hue": 30,
+    "sat": 21,
+    "val": 73,
+    "kelvin": 5632
+  },
+  {
+    "filename": "b-134.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-134.jpg",
+    "hex": "#bac0b6",
+    "hue": 96,
+    "sat": 5,
+    "val": 75,
+    "kelvin": 6400
+  },
+  {
+    "filename": "b-108.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-108.jpg",
+    "hex": "#a5885b",
+    "hue": 36,
+    "sat": 44,
+    "val": 64,
+    "kelvin": 4804
+  },
+  {
+    "filename": "b-054.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-054.jpg",
+    "hex": "#9e8871",
+    "hue": 30,
+    "sat": 28,
+    "val": 61,
+    "kelvin": 5370
+  },
+  {
+    "filename": "b-040.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-040.jpg",
+    "hex": "#d5cab4",
+    "hue": 39,
+    "sat": 15,
+    "val": 83,
+    "kelvin": 5887
+  },
+  {
+    "filename": "b-068.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-068.jpg",
+    "hex": "#d8a551",
+    "hue": 37,
+    "sat": 62,
+    "val": 84,
+    "kelvin": 4232
+  },
+  {
+    "filename": "b-097.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-097.jpg",
+    "hex": "#ae7a4e",
+    "hue": 27,
+    "sat": 55,
+    "val": 68,
+    "kelvin": 4302
+  },
+  {
+    "filename": "b-083.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-083.jpg",
+    "hex": "#aba094",
+    "hue": 31,
+    "sat": 13,
+    "val": 67,
+    "kelvin": 5963
+  },
+  {
+    "filename": "b-082.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-082.jpg",
+    "hex": "#bdb782",
+    "hue": 53,
+    "sat": 31,
+    "val": 74,
+    "kelvin": 5361
+  },
+  {
+    "filename": "b-096.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-096.jpg",
+    "hex": "#958571",
+    "hue": 33,
+    "sat": 24,
+    "val": 58,
+    "kelvin": 5546
+  },
+  {
+    "filename": "b-069.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-069.jpg",
+    "hex": "#c59858",
+    "hue": 35,
+    "sat": 55,
+    "val": 77,
+    "kelvin": 4429
+  },
+  {
+    "filename": "b-041.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-041.jpg",
+    "hex": "#d9ad07",
+    "hue": 47,
+    "sat": 96,
+    "val": 85,
+    "kelvin": 3616
+  },
+  {
+    "filename": "b-055.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-055.jpg",
+    "hex": "#d2baa2",
+    "hue": 30,
+    "sat": 22,
+    "val": 82,
+    "kelvin": 5589
+  },
+  {
+    "filename": "b-109.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-109.jpg",
+    "hex": "#9a917d",
+    "hue": 41,
+    "sat": 18,
+    "val": 60,
+    "kelvin": 5761
+  },
+  {
+    "filename": "b-135.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-135.jpg",
+    "hex": "#a7937b",
+    "hue": 32,
+    "sat": 26,
+    "val": 65,
+    "kelvin": 5460
+  },
+  {
+    "filename": "b-121.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-121.jpg",
+    "hex": "#978d81",
+    "hue": 32,
+    "sat": 14,
+    "val": 59,
+    "kelvin": 5919
+  },
+  {
+    "filename": "b-146.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-146.jpg",
+    "hex": "#c9985f",
+    "hue": 32,
+    "sat": 52,
+    "val": 78,
+    "kelvin": 4473
+  },
+  {
+    "filename": "b-152.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-152.jpg",
+    "hex": "#b99a75",
+    "hue": 32,
+    "sat": 36,
+    "val": 72,
+    "kelvin": 5064
+  },
+  {
+    "filename": "b-185.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-185.jpg",
+    "hex": "#65554f",
+    "hue": 16,
+    "sat": 21,
+    "val": 39,
+    "kelvin": 5605
+  },
+  {
+    "filename": "b-191.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-191.jpg",
+    "hex": "#a25c32",
+    "hue": 22,
+    "sat": 69,
+    "val": 63,
+    "kelvin": 3615
+  },
+  {
+    "filename": "b-032.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-032.jpg",
+    "hex": "#beb07f",
+    "hue": 46,
+    "sat": 33,
+    "val": 74,
+    "kelvin": 5269
+  },
+  {
+    "filename": "b-026.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-026.jpg",
+    "hex": "#797068",
+    "hue": 28,
+    "sat": 14,
+    "val": 47,
+    "kelvin": 5938
+  },
+  {
+    "filename": "b-027.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-027.jpg",
+    "hex": "#e18014",
+    "hue": 31,
+    "sat": 91,
+    "val": 88,
+    "kelvin": 3175
+  },
+  {
+    "filename": "b-033.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-033.jpg",
+    "hex": "#d2c4ac",
+    "hue": 37,
+    "sat": 18,
+    "val": 82,
+    "kelvin": 5786
+  },
+  {
+    "filename": "b-190.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-190.jpg",
+    "hex": "#c8b9a4",
+    "hue": 34,
+    "sat": 17,
+    "val": 78,
+    "kelvin": 5787
+  },
+  {
+    "filename": "b-184.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-184.jpg",
+    "hex": "#c6b49c",
+    "hue": 34,
+    "sat": 21,
+    "val": 77,
+    "kelvin": 5661
+  },
+  {
+    "filename": "b-153.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-153.jpg",
+    "hex": "#746b5f",
+    "hue": 34,
+    "sat": 18,
+    "val": 45,
+    "kelvin": 5782
+  },
+  {
+    "filename": "b-147.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-147.jpg",
+    "hex": "#e1d4b7",
+    "hue": 41,
+    "sat": 18,
+    "val": 88,
+    "kelvin": 5768
+  },
+  {
+    "filename": "b-179.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-179.jpg",
+    "hex": "#ccae10",
+    "hue": 50,
+    "sat": 92,
+    "val": 80,
+    "kelvin": 3796
+  },
+  {
+    "filename": "b-151.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-151.jpg",
+    "hex": "#ada690",
+    "hue": 45,
+    "sat": 16,
+    "val": 67,
+    "kelvin": 5842
+  },
+  {
+    "filename": "b-145.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-145.jpg",
+    "hex": "#878076",
+    "hue": 35,
+    "sat": 12,
+    "val": 52,
+    "kelvin": 5998
+  },
+  {
+    "filename": "b-192.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-192.jpg",
+    "hex": "#7c7169",
+    "hue": 25,
+    "sat": 15,
+    "val": 48,
+    "kelvin": 5886
+  },
+  {
+    "filename": "b-186.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-186.jpg",
+    "hex": "#977d51",
+    "hue": 37,
+    "sat": 46,
+    "val": 59,
+    "kelvin": 4765
+  },
+  {
+    "filename": "b-019.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-019.jpg",
+    "hex": "#c7b089",
+    "hue": 37,
+    "sat": 31,
+    "val": 78,
+    "kelvin": 5298
+  },
+  {
+    "filename": "b-025.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-025.jpg",
+    "hex": "#d3621f",
+    "hue": 22,
+    "sat": 85,
+    "val": 82,
+    "kelvin": 2950
+  },
+  {
+    "filename": "b-031.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-031.jpg",
+    "hex": "#ad9e77",
+    "hue": 43,
+    "sat": 31,
+    "val": 67,
+    "kelvin": 5320
+  },
+  {
+    "filename": "b-030.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-030.jpg",
+    "hex": "#8c737d",
+    "hue": 336,
+    "sat": 17,
+    "val": 54,
+    "kelvin": 6073
+  },
+  {
+    "filename": "b-024.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-024.jpg",
+    "hex": "#a48e7d",
+    "hue": 26,
+    "sat": 23,
+    "val": 64,
+    "kelvin": 5543
+  },
+  {
+    "filename": "b-018.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-018.jpg",
+    "hex": "#71635a",
+    "hue": 23,
+    "sat": 20,
+    "val": 44,
+    "kelvin": 5678
+  },
+  {
+    "filename": "b-187.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-187.jpg",
+    "hex": "#9c8b6b",
+    "hue": 39,
+    "sat": 31,
+    "val": 61,
+    "kelvin": 5296
+  },
+  {
+    "filename": "b-193.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-193.jpg",
+    "hex": "#96928b",
+    "hue": 38,
+    "sat": 7,
+    "val": 58,
+    "kelvin": 6206
+  },
+  {
+    "filename": "b-144.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-144.jpg",
+    "hex": "#baaa94",
+    "hue": 34,
+    "sat": 20,
+    "val": 72,
+    "kelvin": 5692
+  },
+  {
+    "filename": "b-150.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-150.jpg",
+    "hex": "#9f917d",
+    "hue": 35,
+    "sat": 21,
+    "val": 62,
+    "kelvin": 5656
+  },
+  {
+    "filename": "b-178.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-178.jpg",
+    "hex": "#726c5e",
+    "hue": 41,
+    "sat": 17,
+    "val": 44,
+    "kelvin": 5810
+  },
+  {
+    "filename": "b-154.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-154.jpg",
+    "hex": "#ac9c75",
+    "hue": 42,
+    "sat": 31,
+    "val": 67,
+    "kelvin": 5290
+  },
+  {
+    "filename": "b-140.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-140.jpg",
+    "hex": "#a19785",
+    "hue": 38,
+    "sat": 17,
+    "val": 63,
+    "kelvin": 5813
+  },
+  {
+    "filename": "b-168.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-168.jpg",
+    "hex": "#a29b7a",
+    "hue": 49,
+    "sat": 24,
+    "val": 63,
+    "kelvin": 5563
+  },
+  {
+    "filename": "b-197.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-197.jpg",
+    "hex": "#cbc4af",
+    "hue": 45,
+    "sat": 13,
+    "val": 79,
+    "kelvin": 5954
+  },
+  {
+    "filename": "b-183.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-183.jpg",
+    "hex": "#84a699",
+    "hue": 157,
+    "sat": 20,
+    "val": 65,
+    "kelvin": 6961
+  },
+  {
+    "filename": "b-020.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-020.jpg",
+    "hex": "#b74e46",
+    "hue": 4,
+    "sat": 61,
+    "val": 71,
+    "kelvin": 3321
+  },
+  {
+    "filename": "b-034.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-034.jpg",
+    "hex": "#90b8a9",
+    "hue": 157,
+    "sat": 21,
+    "val": 72,
+    "kelvin": 6998
+  },
+  {
+    "filename": "b-008.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-008.jpg",
+    "hex": "#bab3a3",
+    "hue": 41,
+    "sat": 12,
+    "val": 72,
+    "kelvin": 6008
+  },
+  {
+    "filename": "b-009.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-009.jpg",
+    "hex": "#7b8b4b",
+    "hue": 75,
+    "sat": 46,
+    "val": 54,
+    "kelvin": 5258
+  },
+  {
+    "filename": "b-035.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-035.jpg",
+    "hex": "#bc905d",
+    "hue": 32,
+    "sat": 50,
+    "val": 73,
+    "kelvin": 4552
+  },
+  {
+    "filename": "b-021.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-021.jpg",
+    "hex": "#4c6e47",
+    "hue": 112,
+    "sat": 35,
+    "val": 43,
+    "kelvin": 6177
+  },
+  {
+    "filename": "b-182.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-182.jpg",
+    "hex": "#88704a",
+    "hue": 36,
+    "sat": 45,
+    "val": 53,
+    "kelvin": 4781
+  },
+  {
+    "filename": "b-196.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-196.jpg",
+    "hex": "#91b9ad",
+    "hue": 162,
+    "sat": 21,
+    "val": 72,
+    "kelvin": 7074
+  },
+  {
+    "filename": "b-169.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-169.jpg",
+    "hex": "#9da3a5",
+    "hue": 195,
+    "sat": 4,
+    "val": 64,
+    "kelvin": 6699
+  },
+  {
+    "filename": "b-141.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-141.jpg",
+    "hex": "#dbc5aa",
+    "hue": 33,
+    "sat": 22,
+    "val": 85,
+    "kelvin": 5614
+  },
+  {
+    "filename": "b-155.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-155.jpg",
+    "hex": "#7b7266",
+    "hue": 34,
+    "sat": 17,
+    "val": 48,
+    "kelvin": 5822
+  },
+  {
+    "filename": "b-143.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-143.jpg",
+    "hex": "#a4a9a6",
+    "hue": 144,
+    "sat": 2,
+    "val": 66,
+    "kelvin": 6539
+  },
+  {
+    "filename": "b-157.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-157.jpg",
+    "hex": "#b4792b",
+    "hue": 34,
+    "sat": 76,
+    "val": 70,
+    "kelvin": 3729
+  },
+  {
+    "filename": "b-180.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-180.jpg",
+    "hex": "#b08b63",
+    "hue": 31,
+    "sat": 43,
+    "val": 69,
+    "kelvin": 4789
+  },
+  {
+    "filename": "b-194.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-194.jpg",
+    "hex": "#959793",
+    "hue": 89,
+    "sat": 2,
+    "val": 59,
+    "kelvin": 6440
+  },
+  {
+    "filename": "b-037.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-037.jpg",
+    "hex": "#93794a",
+    "hue": 38,
+    "sat": 49,
+    "val": 57,
+    "kelvin": 4665
+  },
+  {
+    "filename": "b-023.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-023.jpg",
+    "hex": "#bf3422",
+    "hue": 6,
+    "sat": 82,
+    "val": 74,
+    "kelvin": 2209
+  },
+  {
+    "filename": "b-022.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-022.jpg",
+    "hex": "#a97f4d",
+    "hue": 32,
+    "sat": 54,
+    "val": 66,
+    "kelvin": 4418
+  },
+  {
+    "filename": "b-036.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-036.jpg",
+    "hex": "#dc8e21",
+    "hue": 34,
+    "sat": 85,
+    "val": 86,
+    "kelvin": 3487
+  },
+  {
+    "filename": "b-195.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-195.jpg",
+    "hex": "#767375",
+    "hue": 320,
+    "sat": 2,
+    "val": 46,
+    "kelvin": 6479
+  },
+  {
+    "filename": "b-181.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-181.jpg",
+    "hex": "#d4bd9a",
+    "hue": 36,
+    "sat": 27,
+    "val": 83,
+    "kelvin": 5432
+  },
+  {
+    "filename": "b-156.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-156.jpg",
+    "hex": "#aa9b7f",
+    "hue": 39,
+    "sat": 25,
+    "val": 66,
+    "kelvin": 5517
+  },
+  {
+    "filename": "b-142.jpg",
+    "path": "file:///Users/leo/Pictures/Uni/SS26/Its a catalog/00-UK/01_berlin/cg_b/b-142.jpg",
+    "hex": "#7d8178",
+    "hue": 86,
+    "sat": 6,
+    "val": 50,
+    "kelvin": 6326
+  }
+];
+
+        function renderGallery() {
+            const grid = document.getElementById('galleryGrid');
+            const sortBy = document.getElementById('sortSelect').value;
+            const hideMono = document.getElementById('hideMono').checked;
+            
+            grid.innerHTML = '';
+
+            // 1. Filtern
+            let filteredPhotos = photos.filter(p => {
+                if (hideMono) {
+                    // SW ausschließen, wenn Sättigung < 10% oder Helligkeit zu extrem ist
+                    return p.sat >= 10 && p.val >= 15;
+                }
+                return true;
+            });
+
+            // 2. Sortieren
+            filteredPhotos.sort((a, b) => {
+                if (sortBy === 'hue') {
+                    // Erst nach Farbkreiswinkel, bei Gleichheit nach Helligkeit absteigend
+                    return a.hue - b.hue || b.val - a.val;
+                } else if (sortBy === 'kelvin_warm') {
+                    return a.kelvin - b.kelvin;
+                } else if (sortBy === 'kelvin_cold') {
+                    return b.kelvin - a.kelvin;
+                } else if (sortBy === 'val') {
+                    return a.val - b.val;
+                } else if (sortBy === 'val_desc') {
+                    return b.val - a.val;
+                } else if (sortBy === 'sat') {
+                    return b.sat - a.sat;
+                } else if (sortBy === 'filename') {
+                    return a.filename.localeCompare(b.filename);
+                }
+                return 0;
+            });
+
+            // 3. Generieren des DOMs
+            filteredPhotos.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="img-container">
+                        <img src="${p.path}" alt="${p.filename}" loading="lazy">
+                    </div>
+                    <div class="info">
+                        <div class="filename" title="${p.filename}">${p.filename}</div>
+                        <div class="meta-row">
+                            <div class="color-preview">
+                                <div class="color-dot" style="background-color: ${p.hex};"></div>
+                                <span>${p.hex}</span>
+                            </div>
+                            <div>Hue: ${p.hue}°</div>
+                        </div>
+                        <div class="meta-row">
+                            <div>Sat: ${p.sat}% | Val: ${p.val}%</div>
+                            <div>${p.kelvin} K</div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            
+            document.getElementById('title-text').innerText = `Foto-Farbanalyse (${filteredPhotos.length} Bilder)`;
+        }
+
+        // Initiales Rendern beim Laden der Seite
+        window.onload = renderGallery;
+    </script>
+</body>
+</html>
