@@ -57,7 +57,8 @@ body {
   padding-left: 0;
   display: flex;
   flex-direction: column;
-  gap: 15px; /* Matches the spacing in the screenshot */
+  gap: 15px;
+  /* Matches the spacing in the screenshot */
 }
 
 /* Image container */
@@ -112,7 +113,8 @@ body {
 }
 
 .block-text {
-  max-width: 100%; /* Line length control for readability */
+  max-width: 100%;
+  /* Line length control for readability */
 }
 
 .slide-placeholder {
@@ -138,7 +140,11 @@ body {
 }
 
 /* Prevent layout shifts and text jumping during typewriter animations */
-#fh-stadt, #fh-station, #fh-stadtteil, #fh-eröffnung, #ff-seite {
+#fh-stadt,
+#fh-station,
+#fh-stadtteil,
+#fh-eröffnung,
+#ff-seite {
   min-height: 1.5em;
   display: block;
 }
@@ -156,4 +162,38 @@ body {
 #ff-review {
   min-height: 4.5em;
   display: block;
+}
+
+.nav-arrow {
+  position: fixed;
+  z-index: 20;
+  background: none;
+  border: none;
+  color: yellow;
+  font-family: inherit;
+  font-size: 24px;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+  opacity: 0.6;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  padding: 15px;
+}
+
+.nav-arrow:hover {
+  opacity: 1;
+}
+
+#nav-arrow-left {
+  transform: translate(-100%, -50%);
+}
+#nav-arrow-left:active {
+  transform: translate(-100%, -50%) scale(0.9);
+}
+
+#nav-arrow-right {
+  transform: translate(0, -50%);
+}
+#nav-arrow-right:active {
+  transform: translate(0, -50%) scale(0.9);
 }

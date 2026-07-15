@@ -145,11 +145,11 @@ function renderCarousel(data) {
                         <div class="footer-left-top uppercase">
                             ${leftColHTML}
                         </div>
-                        <div>${seite && seite !== '#seite' ? 'seite ' + seite : ''}</div>
+                        <div class="uppercase">${seite && seite !== '#seite' ? 'seite ' + seite : ''}</div>
                     </div>
                     <div class="footer-right">
                         <div class="block-text">
-                            ${geschichte} ${sterne} „${review}“ – ${name}
+                            ${geschichte}${geschichte ? '<br>' : ''}${sterne} „${review}“ – ${name}
                         </div>
                     </div>
                 </div>
@@ -160,6 +160,7 @@ function renderCarousel(data) {
     carousel.innerHTML = html;
     adjustLayoutWidths();
     updateFixedText(0);
+    updateArrowVisibility(0);
 }
 
 function adjustLayoutWidths() {
@@ -176,10 +177,14 @@ function adjustLayoutWidths() {
     const img = activeSlide.querySelector('.main-image');
     const fixedHeader = document.getElementById('fixed-header');
     const fixedFooter = document.getElementById('fixed-footer');
+    const leftArrow = document.getElementById('nav-arrow-left');
+    const rightArrow = document.getElementById('nav-arrow-right');
     if (img && fixedHeader && fixedFooter) {
         const applyWidth = () => {
             const rect = img.getBoundingClientRect();
             const width = rect.width;
+            const height = rect.height;
+            const top = rect.top;
             if (width > 0) {
                 const leftPos = (window.innerWidth - width) / 2;
                 fixedHeader.style.width = `${width}px`;
@@ -187,6 +192,15 @@ function adjustLayoutWidths() {
 
                 fixedFooter.style.width = `${width}px`;
                 fixedFooter.style.left = `${leftPos}px`;
+
+                if (leftArrow && rightArrow) {
+                    const arrowTop = top + height / 2;
+                    leftArrow.style.top = `${arrowTop}px`;
+                    leftArrow.style.left = `${leftPos - 10}px`;
+
+                    rightArrow.style.top = `${arrowTop}px`;
+                    rightArrow.style.left = `${leftPos + width + 10}px`;
+                }
             }
         };
 
@@ -291,9 +305,37 @@ function updateFixedText(index) {
     const sterne = item.sterne || '';
     const review = item.review || '';
     const name = item.name || '';
-    const reviewText = `${geschichte} ${sterne} „${review}“ – ${name}`;
+    const reviewText = `${geschichte}${geschichte ? '<br>' : ''}${sterne} „${review}“ – ${name}`;
     
     typewrite(document.getElementById('ff-review'), reviewText, D_LONG);
+}
+
+function updateArrowVisibility(index) {
+    const leftArrow = document.getElementById('nav-arrow-left');
+    const rightArrow = document.getElementById('nav-arrow-right');
+    if (leftArrow && rightArrow) {
+        if (index === 0) {
+            leftArrow.style.visibility = 'hidden';
+        } else {
+            leftArrow.style.visibility = 'visible';
+        }
+        
+        if (index === carouselData.length - 1) {
+            rightArrow.style.visibility = 'hidden';
+        } else {
+            rightArrow.style.visibility = 'visible';
+        }
+    }
+}
+
+function scrollToSlide(index) {
+    const carousel = document.getElementById('carousel');
+    if (!carousel) return;
+    const slideWidth = carousel.clientWidth;
+    carousel.scrollTo({
+        left: index * slideWidth,
+        behavior: 'smooth'
+    });
 }
 
 const carousel = document.getElementById('carousel');
@@ -306,9 +348,41 @@ if (carousel) {
             currentIndex = newIndex;
             updateFixedText(currentIndex);
             adjustLayoutWidths();
+            updateArrowVisibility(currentIndex);
         }
     });
 }
+
+const leftArrow = document.getElementById('nav-arrow-left');
+const rightArrow = document.getElementById('nav-arrow-right');
+
+if (leftArrow) {
+    leftArrow.addEventListener('click', () => {
+        if (currentIndex > 0) {
+            scrollToSlide(currentIndex - 1);
+        }
+    });
+}
+
+if (rightArrow) {
+    rightArrow.addEventListener('click', () => {
+        if (currentIndex < carouselData.length - 1) {
+            scrollToSlide(currentIndex + 1);
+        }
+    });
+}
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') {
+        if (currentIndex > 0) {
+            scrollToSlide(currentIndex - 1);
+        }
+    } else if (e.key === 'ArrowRight') {
+        if (currentIndex < carouselData.length - 1) {
+            scrollToSlide(currentIndex + 1);
+        }
+    }
+});
 
 window.addEventListener('resize', adjustLayoutWidths);
 window.addEventListener('load', adjustLayoutWidths);
