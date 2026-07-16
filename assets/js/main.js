@@ -1,10 +1,11 @@
 let originalData = [];
 let carouselData = [];
 let currentIndex = 0;
+let isGalleryView = false;
 
 // Menu State
 let isMenuOpen = false;
-let currentSort = { field: null, asc: true }; 
+let currentSort = { field: 'stadt', asc: true }; 
 let currentFilters = {};
 let activeDropdown = null;
 let filterOptions = {
@@ -58,7 +59,7 @@ fetch('ubahn.csv')
             filterOptions[key] = Array.from(filterOptions[key]).sort();
         }
         
-        renderCarousel(carouselData);
+        applyFiltersAndSort();
         setupMenu();
     })
     .catch(error => {
@@ -204,6 +205,7 @@ function renderCarousel(data) {
 }
 
 function adjustLayoutWidths() {
+    if (isGalleryView) return;
     const carousel = document.getElementById('carousel');
     if (!carousel) return;
     const slideWidth = carousel.clientWidth;
@@ -232,15 +234,6 @@ function adjustLayoutWidths() {
 
                 fixedFooter.style.width = `${width}px`;
                 fixedFooter.style.left = `${leftPos}px`;
-
-                if (leftArrow && rightArrow) {
-                    const arrowTop = top + height / 2;
-                    leftArrow.style.top = `${arrowTop}px`;
-                    leftArrow.style.left = `${leftPos - 10}px`;
-
-                    rightArrow.style.top = `${arrowTop}px`;
-                    rightArrow.style.left = `${leftPos + width + 10}px`;
-                }
             }
         };
 
@@ -427,6 +420,64 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('resize', adjustLayoutWidths);
 window.addEventListener('load', adjustLayoutWidths);
 
+const viewToggle = document.getElementById('view-toggle');
+if (viewToggle) {
+    viewToggle.addEventListener('click', () => {
+        isGalleryView = !isGalleryView;
+        if (isGalleryView) {
+            document.body.classList.add('gallery-active');
+            document.getElementById('gallery-view').style.display = 'grid';
+            viewToggle.innerText = 'ZURÜCK';
+        } else {
+            document.body.classList.remove('gallery-active');
+            document.getElementById('gallery-view').style.display = 'none';
+            viewToggle.innerText = 'ZUR GALLERIE';
+            setTimeout(() => {
+                adjustLayoutWidths();
+            }, 50);
+        }
+    });
+}
+
+function renderGallery(data) {
+    const galleryView = document.getElementById('gallery-view');
+    if (!galleryView) return;
+    
+    let html = '';
+    data.forEach(item => {
+        if (!item.station || item.station === '') return;
+        const image = item['@image'] || '';
+        if (!image) return;
+        
+        const idx = carouselData.indexOf(item);
+        
+        html += `
+            <div class="gallery-img-container" data-index="${idx}">
+                <img class="gallery-img" src="${image}" loading="lazy" alt="${item.station}">
+            </div>
+        `;
+    });
+    
+    galleryView.innerHTML = html;
+    
+    const items = galleryView.querySelectorAll('.gallery-img-container');
+    items.forEach(el => {
+        el.addEventListener('click', () => {
+            const idx = parseInt(el.getAttribute('data-index'), 10);
+            if (!isNaN(idx)) {
+                isGalleryView = false;
+                document.body.classList.remove('gallery-active');
+                document.getElementById('gallery-view').style.display = 'none';
+                viewToggle.innerText = 'ZUR GALLERIE';
+                setTimeout(() => {
+                    adjustLayoutWidths();
+                    scrollToSlide(idx);
+                }, 50);
+            }
+        });
+    });
+}
+
 // --- Menu Logic ---
 function setupMenu() {
     const menuToggle = document.getElementById('menu-toggle');
@@ -510,8 +561,9 @@ function renderMenu(animate = false) {
     let html = '';
 
     // Sortierung Section
+    html += `<div class="menu-column">`;
     const sortArrow = currentSort.asc ? '^' : 'v';
-    html += `<div class="menu-section-title"><span class="sort-arrow" data-action="toggle-sort-dir">${sortArrow}</span> Sortierung:</div>`;
+    html += `<div class="menu-section-title"><span class="sort-arrow" data-action="toggle-sort-dir">${sortArrow}</span> <span data-action="toggle-sort-dir" style="cursor: pointer;">Sortierung:</span></div>`;
     
     html += `<div class="dropdown-container">`;
     const sortOptions = [
@@ -527,10 +579,11 @@ function renderMenu(animate = false) {
         const isActive = currentSort.field === opt.field ? 'active' : '';
         html += `<div class="menu-item ${isActive}" data-sort="${opt.field}">${opt.label}</div>`;
     });
-    html += `</div><div style="height: 10px;"></div>`;
+    html += `</div></div><div class="menu-separator" style="height: 1.5em;"></div>`;
 
     // Filter Section
-    html += `<div class="menu-section-title">Filter:</div>`;
+    html += `<div class="menu-column">`;
+    html += `<div class="menu-section-title"><span style="visibility: hidden;">v</span> Filter:</div>`;
     html += `<div class="dropdown-container">`;
     
     const filterCategories = [
@@ -548,24 +601,18 @@ function renderMenu(animate = false) {
         
         html += `<div class="menu-item ${isActive}" data-toggle-dropdown="${cat.key}">${cat.label} ${currentFilters[cat.key] ? '(' + currentFilters[cat.key] + ')' : ''}</div>`;
         
-        // Show dropdown items if active
-        if (activeDropdown === cat.key) {
-            html += `<div class="dropdown-container" style="margin-left: 10px; border-left: 1px solid yellow;">`;
-            
-            // Add a "clear" option if currently filtered
-            if (currentFilters[cat.key]) {
-                html += `<div class="menu-item" data-clear-filter="${cat.key}"><em>- Alle anzeigen -</em></div>`;
-            }
-            
-            filterOptions[cat.key].forEach(val => {
-                const isSelected = currentFilters[cat.key] === val ? 'active' : '';
-                html += `<div class="menu-item ${isSelected}" data-filter-key="${cat.key}" data-filter-val="${val}">${val}</div>`;
-            });
-            html += `</div>`;
+        html += `<div class="dropdown-container" style="display: ${activeDropdown === cat.key ? 'block' : 'none'}; padding-left: 2ch; border-left: 1px solid yellow;">`;
+        if (currentFilters[cat.key]) {
+            html += `<div class="menu-item" style="opacity: 0.5;" data-clear-filter="${cat.key}">- Alle anzeigen -</div>`;
         }
+        filterOptions[cat.key].forEach(val => {
+            const isSelected = currentFilters[cat.key] === val ? 'active' : '';
+            html += `<div class="menu-item ${isSelected}" data-filter-key="${cat.key}" data-filter-val="${val}">${val}</div>`;
+        });
+        html += `</div>`;
     });
     
-    html += `</div>`; // end dropdown-container
+    html += `</div></div>`; // end dropdown-container, menu-column
 
     if (animate) {
         typewrite(menuOverlay, html, 600);
@@ -622,6 +669,7 @@ function applyFiltersAndSort() {
     carouselData = result;
     currentIndex = 0; // reset to first slide after filtering/sorting
     renderCarousel(carouselData);
+    renderGallery(carouselData);
     
     // Jump to the first slide
     const carouselEl = document.getElementById('carousel');

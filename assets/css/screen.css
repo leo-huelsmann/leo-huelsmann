@@ -166,6 +166,7 @@ body {
 
 .nav-arrow {
   position: fixed;
+  bottom: 5px; /* 5px bottom + 15px padding aligns arrow glyph with bottom: 20px (footer height) */
   z-index: 20;
   background: none;
   border: none;
@@ -178,6 +179,7 @@ body {
   opacity: 0.6;
   transition: opacity 0.2s ease, transform 0.2s ease;
   padding: 15px;
+  line-height: 1;
 }
 
 .nav-arrow:hover {
@@ -185,18 +187,14 @@ body {
 }
 
 #nav-arrow-left {
-  transform: translate(-100%, -50%);
+  left: 20px;
 }
 #nav-arrow-left:active {
-  transform: translate(-100%, -50%) scale(0.9);
+  transform: scale(0.9);
 }
 
 #nav-arrow-right {
-  bottom: 20px;
   right: 20px;
-  top: auto !important;
-  left: auto !important;
-  transform: none;
 }
 #nav-arrow-right:active {
   transform: scale(0.9);
@@ -215,9 +213,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 25px;
+  font-size: 30px;
   line-height: 1;
-  padding-bottom: 2px;
+  padding-bottom: 0px;
+  transform: translateY(2px);
   cursor: pointer;
   pointer-events: auto;
   z-index: 100;
@@ -234,12 +233,13 @@ body {
   padding-bottom: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 0;
   pointer-events: auto;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
+  white-space: nowrap;
 }
 
 .menu-overlay::-webkit-scrollbar {
@@ -247,22 +247,23 @@ body {
 }
 
 .menu-section-title {
-  margin-bottom: 5px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  margin: 0;
+  margin-bottom: 1.5em;
+  display: block;
+  line-height: 1.5;
 }
 
 .menu-item {
   cursor: pointer;
-  margin-bottom: 3px;
-  opacity: 0.8;
+  margin: 0;
+  opacity: 1;
   transition: opacity 0.2s;
   display: block;
+  line-height: 1.5;
 }
 
 .menu-item:hover {
-  opacity: 1;
+  opacity: 0.7;
 }
 
 .menu-item.active {
@@ -271,15 +272,79 @@ body {
 }
 
 .dropdown-container {
-  padding-left: 15px;
-  margin-top: 5px;
-  margin-bottom: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  padding-left: 2ch;
+  margin: 0;
+  display: block;
 }
 
 .sort-arrow {
   display: inline-block;
   cursor: pointer;
+}
+
+/* Gallery View Styles */
+.view-toggle {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 100;
+  color: yellow;
+  cursor: pointer;
+  user-select: none;
+  line-height: 1.5;
+}
+
+.gallery-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 40px;
+  padding: 220px 45px 45px 45px; /* Top padding increased to clear horizontal menu */
+  height: 100vh;
+  overflow-y: auto;
+  width: 100vw;
+  align-items: start;
+}
+
+.gallery-img-container {
+  width: 100%;
+  cursor: pointer;
+  background: transparent;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.gallery-img-container:hover {
+  transform: scale(1.02);
+  opacity: 0.9;
+}
+
+.gallery-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+body.gallery-active .header-left,
+body.gallery-active .header-right,
+body.gallery-active .fixed-footer,
+body.gallery-active .nav-arrow,
+body.gallery-active #carousel {
+  display: none !important;
+}
+
+body.gallery-active .fixed-header {
+  width: calc(100% - 40px) !important;
+  left: 20px !important;
+}
+
+body.gallery-active .menu-overlay {
+  left: auto !important;
+  right: 45px !important; /* Keep it inside the padding */
+  top: 45px !important; /* Move it down to be aligned just under the U */
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  gap: 40px !important;
+}
+
+body.gallery-active .menu-separator {
+  display: none !important;
 }
